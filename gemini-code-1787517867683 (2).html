@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mi Cartera</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,900&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg: #10161a; --bg-alt: #141c21; --panel: #1a2328; --panel-2: #202b31;
+    --border: #2a363c; --text: #ece7dc; --text-dim: #8fa0a6; --gold: #c9a24b;
+    --gold-dim: #8f7534; --gain: #57a374; --loss: #c15b46; --radius: 10px;
+  }
+  *{box-sizing:border-box;} html,body{margin:0;padding:0;}
+  body{
+    background: radial-gradient(1200px 500px at 10% -10%, rgba(201,162,75,0.06), transparent 60%), var(--bg);
+    color:var(--text); font-family:'Inter',sans-serif; min-height:100vh; padding-bottom:60px;
+  }
+  ::selection{ background: rgba(201,162,75,0.35); }
+  h1,h2,h3{ font-family:'Fraunces', serif; margin:0; font-weight:600; letter-spacing:0.2px; }
+  .mono{ font-family:'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; }
+  a{color:var(--gold);}
+
+  /* ---- Ticker tape ---- */
+  .ticker-wrap{
+    width:100%; overflow:hidden; background:#0c1114; border-bottom:1px solid var(--border);
+    white-space:nowrap; position:relative;
+  }
+  .ticker-track{ display:inline-block; padding-left:100%; animation: ticker-scroll 40s linear infinite; }
+  .ticker-wrap:hover .ticker-track{ animation-play-state: paused; }
+  @keyframes ticker-scroll{ from{ transform:translateX(0);} to{ transform:translateX(-100%);} }
+  .ticker-item{ display:inline-flex; align-items:center; gap:8px; padding:8px 22px; font-family:'IBM Plex Mono',monospace; font-size:13px; }
+  .ticker-item .sym{ color:var(--gold); font-weight:600; }
+  .ticker-item .pct.up{ color:var(--gain); } .ticker-item .pct.down{ color:var(--loss); }
+  .ticker-item .sep{ color:var(--border); }
+
+  /* ---- Layout ---- */
+  .wrap{ max-width:1280px; margin:0 auto; padding:0 28px; }
+  header.top{ padding:32px 28px 18px; max-width:1280px; margin:0 auto; display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:14px; }
+  header.top .eyebrow{ color:var(--gold); font-size:12px; letter-spacing:2.5px; text-transform:uppercase; font-family:'Inter',sans-serif; font-weight:600; }
+  header.top h1{ font-size:34px; margin-top:4px; }
+  header.top .date{ color:var(--text-dim); font-size:13px; font-family:'IBM Plex Mono',monospace; }
+  .fx-input{ display:flex; align-items:center; gap:8px; background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:8px 12px; }
+  .fx-input label{ font-size:12px; color:var(--text-dim); }
+  .fx-input input{ width:90px; background:transparent; border:none; color:var(--gold); font-family:'IBM Plex Mono',monospace; font-size:14px; outline:none; }
+
+  /* ---- Summary cards ---- */
+  .summary{ display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:14px; margin:8px 0 26px; }
+  .card{ background:linear-gradient(180deg, var(--panel), var(--panel-2)); border:1px solid var(--border); border-radius:var(--radius); padding:18px 20px; }
+  .card .label{ font-size:11px; text-transform:uppercase; letter-spacing:1.5px; color:var(--text-dim); margin-bottom:8px; }
+  .card .value{ font-size:26px; font-weight:600; font-family:'IBM Plex Mono',monospace; }
+  .card .sub{ font-size:12.5px; margin-top:6px; color:var(--text-dim); }
+  .card.gain .value, .card.gain .sub.pos{ color:var(--gain); }
+  .card.loss .value, .card.loss .sub.pos{ color:var(--loss); }
+  .pos{ color:var(--gain); } .neg{ color:var(--loss); }
+
+  /* ---- Main grid ---- */
+  .main-grid{ display:grid; grid-template-columns: 1.55fr 1fr; gap:20px; align-items:start; }
+  @media (max-width:920px){ .main-grid{ grid-template-columns:1fr; } }
+
+  .panel{ background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:20px; margin-bottom:20px; }
+  .panel h2{ font-size:18px; margin-bottom:14px; display:flex; align-items:center; gap:10px; }
+  .panel h2::before{ content:''; width:6px; height:6px; background:var(--gold); border-radius:1px; transform:rotate(45deg); display:inline-block; }
+
+  table{ width:100%; border-collapse:collapse; font-size:13px; }
+  thead th{ text-align:left; color:var(--text-dim); font-weight:500; font-size:11px; text-transform:uppercase; letter-spacing:1px; padding:6px 8px; border-bottom:1px solid var(--border); }
+  tbody td{ padding:8px; border-bottom:1px solid rgba(42,54,60,0.6); vertical-align:middle; }
+  tbody tr:hover{ background:rgba(201,162,75,0.04); }
+  td.num, th.num{ text-align:right; font-family:'IBM Plex Mono',monospace; }
+  input.cell, select.cell{ width:100%; background:transparent; border:1px solid transparent; color:var(--text); font-family:'IBM Plex Mono',monospace; font-size:13px; padding:4px 6px; border-radius:6px; }
+  input.cell:focus, select.cell:focus{ border-color:var(--gold-dim); outline:none; background:rgba(201,162,75,0.05); }
+  select.cell{ font-family:'Inter',sans-serif; }
+  .tipo-badge{ font-size:10.5px; padding:2px 7px; border-radius:20px; border:1px solid var(--border); color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; }
+  .del-btn{ background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:16px; padding:2px 6px; border-radius:6px; }
+  .del-btn:hover{ color:var(--loss); background:rgba(193,91,70,0.1); }
+
+  .add-form{ display:grid; grid-template-columns: 0.9fr 1.3fr 1fr 0.8fr 0.9fr 0.9fr 0.7fr auto; gap:8px; margin-top:14px; align-items:end; }
+  .add-form .field label{ display:block; font-size:10.5px; color:var(--text-dim); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px; }
+  .add-form input, .add-form select{ width:100%; background:var(--bg-alt); border:1px solid var(--border); color:var(--text); padding:8px 9px; border-radius:7px; font-size:13px; font-family:'Inter',sans-serif; }
+  @media (max-width:920px){ .add-form{ grid-template-columns:1fr 1fr; } }
+
+  button.primary{ background:var(--gold); color:#181209; border:none; padding:9px 16px; border-radius:7px; font-weight:600; cursor:pointer; font-size:13px; font-family:'Inter',sans-serif; white-space:nowrap; }
+  button.primary:hover{ background:#dab662; }
+  button.primary:disabled{ opacity:0.5; cursor:default; }
+  button.ghost{ background:transparent; border:1px solid var(--border); color:var(--text); padding:8px 14px; border-radius:7px; cursor:pointer; font-size:12.5px; font-family:'Inter',sans-serif; }
+  button.ghost:hover{ border-color:var(--gold-dim); color:var(--gold); }
+
+  .chart-box{ position:relative; height:230px; }
+  .legend-list{ margin-top:10px; font-size:12px; }
+  .legend-row{ display:flex; justify-content:space-between; padding:3px 0; color:var(--text-dim); }
+  .legend-row .dot{ width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:6px; }
+  .legend-row span.name{ color:var(--text); }
+
+  .informe-body{ font-size:13.5px; line-height:1.65; color:#d8d3c6; white-space:pre-wrap; }
+  .informe-meta{ color:var(--text-dim); font-size:11.5px; margin-top:12px; border-top:1px solid var(--border); padding-top:10px; }
+  .empty-note{ color:var(--text-dim); font-size:13px; font-style:italic; }
+  .warn{ font-size:12px; color:var(--gold); background:rgba(201,162,75,0.08); border:1px solid var(--gold-dim); padding:8px 10px; border-radius:7px; margin-top:10px; }
+  .spinner{ display:inline-block; width:13px; height:13px; border:2px solid rgba(255,255,255,0.25); border-top-color:#181209; border-radius:50%; animation:spin 0.7s linear infinite; vertical-align:-2px; margin-right:6px; }
+  @keyframes spin{ to{ transform:rotate(360deg);} }
+  .toolbar{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+</style>
+</head>
+<body>
+
+<div class="ticker-wrap"><div class="ticker-track" id="tickerTrack"></div></div>
+
+<header class="top">
+  <div>
+    <div class="eyebrow">Cartera personal</div>
+    <h1>Mi Cartera</h1>
+    <div class="date" id="todayDate"></div>
+  </div>
+  <div class="fx-input">
+    <label>Dólar MEP (ARS por USD)</label>
+    <input type="number" id="fxRate" placeholder="Calculando..." />
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="summary" id="summaryCards"></div>
+
+  <div class="main-grid">
+    <!-- LEFT: holdings -->
+    <div>
+      <div class="panel">
+        <h2>Importar tabla del bróker</h2>
+        <p style="font-size:12.5px; color:var(--text-dim); margin:-6px 0 12px;">
+          Pegá directamente la tabla de "Mis Inversiones" tal cual la copiás de tu bróker.
+        </p>
+        <textarea id="brokerInput" rows="6" style="width:100%; background:var(--bg-alt); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:10px 12px; font-family:'IBM Plex Mono',monospace; font-size:12px; resize:vertical;"></textarea>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+          <button class="primary" id="btnBrokerLoad" type="button">Importar tabla</button>
+          <span id="brokerStatus" style="font-size:12px; color:var(--text-dim);"></span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Posiciones</h2>
+        <div id="tableWrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Ticker</th>
+                <th>Sector</th>
+                <th>Moneda</th>
+                <th class="num">Cantidad</th>
+                <th class="num">P. compra</th>
+                <th class="num">P. actual</th>
+                <th class="num">Invertido</th>
+                <th class="num">Valor actual</th>
+                <th class="num">Result. $</th>
+                <th class="num">Result. %</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="holdingsBody"></tbody>
+          </table>
+          <div id="emptyNote" class="empty-note" style="display:none; padding:16px 4px;">
+            Todavía no cargaste posiciones.
+          </div>
+        </div>
+
+        <form class="add-form" id="addForm">
+          <div class="field"><label>Tipo</label><select id="f_tipo"><option>Acción</option><option>CEDEAR</option><option>ON</option><option>Bono</option></select></div>
+          <div class="field"><label>Ticker</label><input id="f_ticker" placeholder="ej: AL30" required /></div>
+          <div class="field"><label>Sector</label><input id="f_sector" placeholder="ej: Energía" /></div>
+          <div class="field"><label>Moneda</label><select id="f_moneda"><option>ARS</option><option>USD</option></select></div>
+          <div class="field"><label>Cant.</label><input id="f_cantidad" type="number" step="any" placeholder="0" required /></div>
+          <div class="field"><label>P. compra</label><input id="f_precioCompra" type="number" step="any" placeholder="0" required /></div>
+          <div class="field"><label>P. actual</label><input id="f_precioActual" type="number" step="any" placeholder="0" /></div>
+          <button class="primary" type="submit">+ Agregar</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- RIGHT: charts + informe -->
+    <div>
+      <div class="panel">
+        <div class="toolbar">
+          <button class="ghost" id="btnUpdatePrices">Actualizar precios con IA</button>
+        </div>
+        <h2>Ponderación por activo</h2>
+        <div class="chart-box"><canvas id="chartActivo"></canvas></div>
+        <div class="legend-list" id="legendActivo"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Ponderación por sector</h2>
+        <div class="chart-box"><canvas id="chartSector"></canvas></div>
+        <div class="legend-list" id="legendSector"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Informe diario</h2>
+        <button class="primary" id="btnInforme" style="margin-bottom:14px;">Generar informe de hoy</button>
+        <div id="informeArea"><p class="empty-note">Todavía no generaste el informe de hoy.</p></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const fmtMoney = (n, cur='ARS') => {
+  if (n === null || n === undefined || isNaN(n)) n = 0;
+  const sign = n < 0 ? '-' : '';
+  const abs = Math.abs(n);
+  return sign + (cur === 'USD' ? 'U$S ' : '$ ') + abs.toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2});
+};
+const fmtPct = (n) => {
+  if (n === null || n === undefined || isNaN(n)) n = 0;
+  return (n >= 0 ? '+' : '') + n.toFixed(2) + '%';
+};
+
+let holdings = [];
+let fxRate = null;
+
+const COLORS = ['#c9a24b','#57a374','#c15b46','#5b8bb0','#a97fc9','#c9c04b','#4bb0a2','#c96f8d','#8fa0a6','#7c9c4f'];
+
+// CORRECCIÓN 1: Usar localStorage en vez del inexistente window.storage
+async function loadState(){
+  try{
+    const h = localStorage.getItem('holdings');
+    holdings = h ? JSON.parse(h) : [];
+  }catch(e){ holdings = []; }
+  try{
+    const fx = localStorage.getItem('fxRate');
+    fxRate = fx ? parseFloat(fx) : null;
+  }catch(e){ fxRate = null; }
+  if (fxRate) document.getElementById('fxRate').value = fxRate;
+
+  try{
+    const cache = localStorage.getItem('informe-cache');
+    if (cache){
+      const data = JSON.parse(cache);
+      const today = new Date().toISOString().slice(0,10);
+      if (data.date === today){
+        renderInforme(data.text, data.date, data.time);
+      }
+    }
+  }catch(e){}
+}
+
+async function saveHoldings(){
+  try{ localStorage.setItem('holdings', JSON.stringify(holdings)); }catch(e){ console.error(e); }
+}
+async function saveFx(){
+  try{ if(fxRate!==null) localStorage.setItem('fxRate', String(fxRate)); }catch(e){}
+}
+
+// CORRECCIÓN 2: Fetch automático a DolarAPI para buscar el dólar MEP al iniciar
+async function fetchDollar() {
+  try {
+    const res = await fetch('https://dolarapi.com/v1/dolares/mep');
+    const data = await res.json();
+    if(data && data.venta) {
+      fxRate = data.venta;
+      document.getElementById('fxRate').value = fxRate;
+      saveFx();
+      renderAll();
+    }
+  } catch(e) {
+    console.error("Error obteniendo dólar", e);
+  }
+}
+
+function valorEnARS(h){
+  const v = h.cantidad * (h.precioActual || 0);
+  if (h.moneda === 'USD'){ return fxRate ? v * fxRate : null; }
+  return v;
+}
+function invertidoEnARS(h){
+  const v = h.cantidad * (h.precioCompra || 0);
+  if (h.moneda === 'USD'){ return fxRate ? v * fxRate : null; }
+  return v;
+}
+
+function computeRow(h){
+  const invertido = h.cantidad * (h.precioCompra || 0);
+  const actual = h.cantidad * (h.precioActual || 0);
+  const resultado = actual - invertido;
+  const resultadoPct = invertido !== 0 ? (resultado / invertido) * 100 : 0;
+  return { invertido, actual, resultado, resultadoPct };
+}
+
+function renderAll(){
+  renderTable(); renderSummary(); renderTicker(); renderCharts(); saveHoldings();
+}
+
+function renderTable(){
+  const body = document.getElementById('holdingsBody');
+  const empty = document.getElementById('emptyNote');
+  body.innerHTML = '';
+  empty.style.display = holdings.length ? 'none' : 'block';
+
+  holdings.forEach((h, idx) => {
+    const { invertido, actual, resultado, resultadoPct } = computeRow(h);
+    const tr = document.createElement('tr');
+    const curSym = h.moneda === 'USD' ? 'U$S' : '$';
+    tr.innerHTML = `
+      <td><span class="tipo-badge">${h.tipo}</span></td>
+      <td><input class="cell" data-field="ticker" data-idx="${idx}" value="${h.ticker}" /></td>
+      <td><input class="cell" data-field="sector" data-idx="${idx}" value="${h.sector||''}" /></td>
+      <td>
+        <select class="cell" data-field="moneda" data-idx="${idx}">
+          <option ${h.moneda==='ARS'?'selected':''}>ARS</option>
+          <option ${h.moneda==='USD'?'selected':''}>USD</option>
+        </select>
+      </td>
+      <td class="num"><input class="cell" style="text-align:right" type="number" step="any" data-field="cantidad" data-idx="${idx}" value="${h.cantidad}" /></td>
+      <td class="num"><input class="cell" style="text-align:right" type="number" step="any" data-field="precioCompra" data-idx="${idx}" value="${h.precioCompra}" /></td>
+      <td class="num"><input class="cell" style="text-align:right" type="number" step="any" data-field="precioActual" data-idx="${idx}" value="${h.precioActual||0}" /></td>
+      <td class="num mono">${curSym} ${invertido.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+      <td class="num mono">${curSym} ${actual.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+      <td class="num mono ${resultado>=0?'pos':'neg'}">${curSym} ${resultado.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+      <td class="num mono ${resultadoPct>=0?'pos':'neg'}">${fmtPct(resultadoPct)}</td>
+      <td><button class="del-btn" data-del="${idx}" title="Eliminar">✕</button></td>
+    `;
+    body.appendChild(tr);
+  });
+
+  body.querySelectorAll('input.cell, select.cell').forEach(el => {
+    el.addEventListener('change', (e) => {
+      const idx = parseInt(e.target.dataset.idx);
+      const field = e.target.dataset.field;
+      let val = e.target.value;
+      if (['cantidad','precioCompra','precioActual'].includes(field)) val = parseFloat(val) || 0;
+      holdings[idx][field] = val;
+      renderAll();
+    });
+  });
+  body.querySelectorAll('button[data-del]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const idx = parseInt(e.target.dataset.del);
+      holdings.splice(idx, 1);
+      renderAll();
+    });
+  });
+}
+
+function renderSummary(){
+  let investedARS = 0, valueARS = 0, unconverted = false;
+  let investedUSD = 0, valueUSD = 0;
+
+  holdings.forEach(h => {
+    const { invertido, actual } = computeRow(h);
+    if (h.moneda === 'USD'){
+      investedUSD += invertido; valueUSD += actual;
+      if (fxRate){ investedARS += invertido * fxRate; valueARS += actual * fxRate; }
+      else unconverted = true;
+    } else {
+      investedARS += invertido; valueARS += actual;
+    }
+  });
+
+  const resultadoARS = valueARS - investedARS;
+  const resultadoPct = investedARS !== 0 ? (resultadoARS/investedARS)*100 : 0;
+
+  const cards = document.getElementById('summaryCards');
+  cards.innerHTML = `
+    <div class="card">
+      <div class="label">Invertido (consolidado ARS)</div>
+      <div class="value">${fmtMoney(investedARS)}</div>
+      <div class="sub">${investedUSD ? 'incluye U$S ' + investedUSD.toLocaleString('es-AR',{minimumFractionDigits:2}) + ' en activos dolarizados' : 'sin posiciones en USD'}</div>
+    </div>
+    <div class="card">
+      <div class="label">Valor actual (consolidado ARS)</div>
+      <div class="value">${fmtMoney(valueARS)}</div>
+      <div class="sub">${valueUSD ? 'incluye U$S ' + valueUSD.toLocaleString('es-AR',{minimumFractionDigits:2}) + ' en activos dolarizados' : ''}</div>
+    </div>
+    <div class="card ${resultadoARS>=0?'gain':'loss'}">
+      <div class="label">Resultado</div>
+      <div class="value">${fmtMoney(resultadoARS)}</div>
+      <div class="sub pos">${fmtPct(resultadoPct)} sobre lo invertido</div>
+    </div>
+    <div class="card">
+      <div class="label">Posiciones cargadas</div>
+      <div class="value">${holdings.length}</div>
+      <div class="sub">${new Set(holdings.map(h=>h.tipo)).size} tipos de activo distintos</div>
+    </div>
+  `;
+}
+
+function renderTicker(){
+  const track = document.getElementById('tickerTrack');
+  if (!holdings.length){ track.innerHTML = '<span class="ticker-item">Cargá posiciones para ver el resumen acá &nbsp;•&nbsp;</span>'; return; }
+  let html = '';
+  const list = [...holdings, ...holdings];
+  list.forEach(h => {
+    const { resultadoPct } = computeRow(h);
+    const cls = resultadoPct >= 0 ? 'up' : 'down';
+    const arrow = resultadoPct >= 0 ? '▲' : '▼';
+    html += `<span class="ticker-item"><span class="sym">${h.ticker}</span><span class="pct ${cls}">${arrow} ${fmtPct(resultadoPct)}</span><span class="sep">•</span></span>`;
+  });
+  track.innerHTML = html;
+}
+
+let chartActivo, chartSector;
+function renderCharts(){
+  const byActivo = [];
+  const bySectorMap = {};
+  let totalARS = 0;
+
+  holdings.forEach(h => {
+    const v = valorEnARS(h);
+    if (v === null) return;
+    totalARS += v;
+    byActivo.push({ label: h.ticker, value: v });
+    const sec = h.sector || 'Sin sector';
+    bySectorMap[sec] = (bySectorMap[sec] || 0) + v;
+  });
+
+  const bySector = Object.entries(bySectorMap).map(([label, value]) => ({label, value}));
+
+  drawPie('chartActivo', 'legendActivo', byActivo, totalARS);
+  drawPie('chartSector', 'legendSector', bySector, totalARS);
+}
+
+function drawPie(canvasId, legendId, data, total){
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  const legend = document.getElementById(legendId);
+  const existing = canvasId === 'chartActivo' ? chartActivo : chartSector;
+  if (existing) existing.destroy();
+
+  if (!data.length || total === 0){
+    legend.innerHTML = '<div class="empty-note">Sin datos suficientes todavía.</div>';
+    const emptyChart = new Chart(ctx, { type:'doughnut', data:{ labels:['Sin datos'], datasets:[{ data:[1], backgroundColor:['#2a363c'], borderWidth:0 }] }, options:{ plugins:{ legend:{ display:false }, tooltip:{ enabled:false } }, cutout:'62%' } });
+    if (canvasId === 'chartActivo') chartActivo = emptyChart; else chartSector = emptyChart;
+    return;
+  }
+
+  data.sort((a,b) => b.value - a.value);
+  const colors = data.map((_, i) => COLORS[i % COLORS.length]);
+  const chart = new Chart(ctx, {
+    type:'doughnut',
+    data:{ labels:data.map(d=>d.label), datasets:[{ data:data.map(d=>d.value), backgroundColor:colors, borderColor:'#1a2328', borderWidth:2 }] },
+    options:{ plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label: (c) => { return `${c.label}: ${(c.parsed / total * 100).toFixed(1)}%`; }}}}, cutout:'62%' }
+  });
+  if (canvasId === 'chartActivo') chartActivo = chart; else chartSector = chart;
+
+  legend.innerHTML = data.map((d, i) => {
+    return `<div class="legend-row"><span><span class="dot" style="background:${colors[i]}"></span><span class="name">${d.label}</span></span><span>${(d.value / total * 100).toFixed(1)}%</span></div>`;
+  }).join('');
+}
+
+document.getElementById('addForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const h = {
+    tipo: document.getElementById('f_tipo').value,
+    ticker: document.getElementById('f_ticker').value.trim().toUpperCase(),
+    sector: document.getElementById('f_sector').value.trim(),
+    moneda: document.getElementById('f_moneda').value,
+    cantidad: parseFloat(document.getElementById('f_cantidad').value) || 0,
+    precioCompra: parseFloat(document.getElementById('f_precioCompra').value) || 0,
+    precioActual: parseFloat(document.getElementById('f_precioActual').value) || parseFloat(document.getElementById('f_precioCompra').value) || 0,
+  };
+  if (!h.ticker || !h.cantidad || !h.precioCompra) return;
+  holdings.push(h); e.target.reset(); document.getElementById('f_tipo').value = h.tipo; renderAll();
+});
+
+document.getElementById('fxRate').addEventListener('change', (e) => {
+  fxRate = parseFloat(e.target.value) || null;
+  saveFx(); renderAll();
+});
+
+// CORRECCIÓN 3: Explicar por qué las funciones de IA fallan en la web y atrapar el error sin romper nada.
+async function callClaude(promptText, useWebSearch, maxTokens){
+  throw new Error("Para usar inteligencia artificial desde un HTML local, necesitás configurar una API Key paga, o tener un servidor backend. El navegador bloquea estas consultas por seguridad.");
+}
+
+function renderInforme(text, date, time){
+  document.getElementById('informeArea').innerHTML = `
+    <div class="informe-body">${text.replace(/</g,'&lt;')}</div>
+    <div class="informe-meta">Generado el ${date} a las ${time}</div>
+  `;
+}
+
+document.getElementById('btnInforme').addEventListener('click', async () => {
+  const btn = document.getElementById('btnInforme');
+  btn.disabled = true;
+  try{
+    await callClaude("", false, 0); // Dispara el aviso de error de IA
+  }catch(e){
+    document.getElementById('informeArea').innerHTML = `<p class="warn"><b>Aviso:</b> ${e.message}</p>`;
+  }
+  btn.disabled = false;
+});
+
+document.getElementById('btnUpdatePrices').addEventListener('click', async () => {
+  const btn = document.getElementById('btnUpdatePrices');
+  btn.disabled = true;
+  try{
+    await callClaude("", false, 0); // Dispara el aviso de error de IA
+  }catch(e){
+    alert(e.message);
+  }
+  btn.disabled = false;
+});
+
+// Parseo de tabla (sin cambios, funcionaba bien)
+const SECTOR_GUESS = { VIST:'Energía', PAMP:'Energía', YPFD:'Energía' };
+const CATEGORY_MAP = { 'bonos':'Bono', 'cedears':'CEDEAR', 'obligaciones negociables':'ON', 'acciones':'Acción' };
+function parseArNumber(str){
+  if (!str) return 0;
+  let t = String(str).replace(/USD/gi,'').replace(/\$/g,'').replace('%','').trim();
+  if (t === '' || t === '-') return 0;
+  const n = parseFloat(t.replace(/\./g,'').replace(',', '.'));
+  return isNaN(n) ? 0 : n;
+}
+
+document.getElementById('btnBrokerLoad').addEventListener('click', () => {
+  const status = document.getElementById('brokerStatus');
+  const raw = document.getElementById('brokerInput').value;
+  if (!raw.trim()){ status.textContent = 'Pegá la tabla primero.'; return; }
+  
+  const lines = raw.split('\n').map(l => l.replace(/\r$/,'')).filter(l => l.trim() !== '');
+  const parsed = [];
+  let currentTipo = null;
+  let i = 0;
+  while (i < lines.length){
+    const line = lines[i];
+    const firstToken = line.split('\t')[0].trim().toLowerCase();
+    if (CATEGORY_MAP[firstToken]){ currentTipo = CATEGORY_MAP[firstToken]; i++; continue; }
+    if (/^producto$/i.test(firstToken) || /^mis inversiones$/i.test(line.trim())){ i++; continue; }
+
+    const tickerCandidate = line.trim();
+    const isTickerLike = /^[A-Z][A-Z0-9]{1,7}$/.test(tickerCandidate);
+    if (isTickerLike && currentTipo && i + 2 < lines.length){
+      const dataLine = lines[i+2];
+      let f = dataLine.split('\t').map(s=>s.trim()).filter(s=>s!=='');
+      if (f.length >= 5){
+        parsed.push({
+          tipo: currentTipo, ticker: tickerCandidate,
+          sector: SECTOR_GUESS[tickerCandidate] || (currentTipo === 'ON' ? 'Renta fija corporativa' : ''),
+          moneda: /USD/i.test(f[1]) || /USD/i.test(f[4]) ? 'USD' : 'ARS',
+          cantidad: parseArNumber(f[0]), precioCompra: parseArNumber(f[4]), precioActual: parseArNumber(f[1]),
+        });
+        i += 3; continue;
+      }
+    }
+    i++;
+  }
+  
+  if (!parsed.length){
+    status.textContent = 'No se reconoció ninguna posición.'; return;
+  }
+  parsed.forEach(p => { if(p.cantidad > 0) holdings.push(p); });
+  renderAll();
+  status.textContent = `Se importaron ${parsed.length} posiciones correctamente.`;
+});
+
+// ---- Init ----
+(async function init(){
+  document.getElementById('todayDate').textContent = new Date().toLocaleDateString('es-AR', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  await loadState();
+  if (!fxRate) { await fetchDollar(); }
+  renderAll();
+})();
+</script>
+</body>
+</html>

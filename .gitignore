@@ -1,0 +1,9 @@
+node_modules/
+backend/src/generado/
+backend/.env
+*.db
+*.db-journal
+backend/test/.plantilla.db
+coverage/
+dist/
+.angular/

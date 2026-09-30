@@ -1,0 +1,31 @@
+{
+  "name": "cartera-gala",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "contratos",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @cartera/backend",
+    "test": "npm run test --workspaces --if-present",
+    "tipos": "npm run tipos --workspaces --if-present",
+    "lint": "eslint .",
+    "formato": "prettier --write .",
+    "formato:verificar": "prettier --check .",
+    "db:migrate": "npm run db:migrate -w @cartera/backend",
+    "db:seed": "npm run db:seed -w @cartera/backend"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "eslint": "^10.11.0",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-boundaries": "^7.2.0",
+    "prettier": "^3.9.9",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.0"
+  }
+}

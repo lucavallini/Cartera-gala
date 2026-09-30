@@ -1,0 +1,8 @@
+node_modules
+**/generado
+**/migrations
+package-lock.json
+docs
+/*.html
+*.db
+backend/test/fixtures

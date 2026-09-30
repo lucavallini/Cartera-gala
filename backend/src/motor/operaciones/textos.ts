@@ -1,0 +1,25 @@
+import type { TipoOperacion } from "@cartera/contratos";
+
+export const TEXTO_TIPO_OPERACION: Record<TipoOperacion, string> = {
+  TENENCIA_INICIAL: "Tenencia inicial",
+  COMPRA: "Compra",
+  VENTA: "Venta",
+  DIVIDENDO: "Dividendo",
+  RENTA: "Renta (cupón)",
+  AMORTIZACION: "Amortización",
+  SUSCRIPCION_FCI: "Suscripción a un fondo",
+  RESCATE_FCI: "Rescate de un fondo",
+  DEPOSITO: "Depósito",
+  EXTRACCION: "Extracción",
+  COMPRA_MONEDA: "Compra de dólares",
+  VENTA_MONEDA: "Venta de dólares",
+  CAUCION_COLOCACION: "Colocación de caución",
+  CAUCION_VENCIMIENTO: "Vencimiento de caución",
+  COMISION: "Comisión o gasto",
+  IMPUESTO: "Impuesto",
+  SPLIT: "Split",
+  CANJE: "Canje",
+  TRANSFERENCIA_ENTRADA: "Transferencia recibida",
+  TRANSFERENCIA_SALIDA: "Transferencia enviada",
+  AJUSTE: "Ajuste",
+};

@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pizarra — Mi Cartera</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#22252a;
+    --bg-alt:#2c3037;
+    --bg-raised:#33383f;
+    --board:#1b1e22;
+    --text:#EDEAE2;
+    --text-dim:#9BA1A8;
+    --text-faint:#6b7178;
+    --green:#4FA88F;
+    --green-bg:rgba(79,168,143,0.12);
+    --red:#C1554A;
+    --red-bg:rgba(193,85,74,0.12);
+    --amber:#E8A33D;
+    --amber-bg:rgba(232,163,61,0.12);
+    --border:#3c414a;
+    --font-display:'Space Grotesk', sans-serif;
+    --font-mono:'IBM Plex Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--font-display);
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:var(--amber); color:var(--board);}
+  :focus-visible{outline:2px solid var(--amber); outline-offset:2px;}
+
+  .wrap{max-width:1180px; margin:0 auto; padding:20px 20px 60px;}
+
+  /* ===== Pizarra header ===== */
+  .board{
+    background:var(--board);
+    border:1px solid var(--border);
+    border-radius:6px;
+    padding:22px 24px;
+    margin-bottom:22px;
+    position:relative;
+    overflow:hidden;
+  }
+  .board::before{
+    content:"";
+    position:absolute; inset:0;
+    background:repeating-linear-gradient(180deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px, transparent 1px, transparent 26px);
+    pointer-events:none;
+  }
+  .board-top{display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:8px; margin-bottom:14px;}
+  .board-title{font-family:var(--font-mono); font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:var(--text-dim);}
+  .board-updated{font-family:var(--font-mono); font-size:11px; color:var(--text-faint);}
+  .board-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:18px;}
+  @media (max-width:720px){.board-grid{grid-template-columns:1fr;}}
+  .board-cell{border-right:1px solid var(--border); padding-right:18px;}
+  .board-cell:last-child{border-right:none;}
+  @media (max-width:720px){.board-cell{border-right:none; border-bottom:1px solid var(--border); padding-bottom:14px;}}
+  .board-label{font-family:var(--font-mono); font-size:11px; text-transform:uppercase; letter-spacing:0.12em; color:var(--text-dim); margin-bottom:6px;}
+  .board-value{font-family:var(--font-mono); font-size:30px; font-weight:600; letter-spacing:0.01em; font-variant-numeric:tabular-nums;}
+  .board-value.pos{color:var(--green);}
+  .board-value.neg{color:var(--red);}
+  .board-sub{font-family:var(--font-mono); font-size:13px; color:var(--text-dim); margin-top:4px;}
+
+  /* ===== layout ===== */
+  .grid{display:grid; grid-template-columns:1.35fr 1fr; gap:20px; align-items:start;}
+  @media (max-width:980px){.grid{grid-template-columns:1fr;}}
+
+  .card{background:var(--bg-alt); border:1px solid var(--border); border-radius:6px; padding:20px;}
+  .card + .card{margin-top:20px;}
+  .card-head{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap;}
+  .card-head h2{font-size:15px; margin:0; text-transform:uppercase; letter-spacing:0.1em; color:var(--text-dim); font-weight:600;}
+  .hint{font-size:12.5px; color:var(--text-faint); line-height:1.5; margin-top:6px;}
+
+  /* ===== form ===== */
+  form.addform{display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:10px; margin-bottom:6px;}
+  @media (max-width:600px){form.addform{grid-template-columns:1fr 1fr;}}
+  form.addform label{display:flex; flex-direction:column; font-size:11px; color:var(--text-dim); gap:5px; text-transform:uppercase; letter-spacing:0.06em;}
+  input, select{
+    background:var(--bg-raised); border:1px solid var(--border); color:var(--text);
+    padding:9px 10px; border-radius:4px; font-family:var(--font-mono); font-size:13.5px;
+  }
+  input::placeholder{color:var(--text-faint);}
+  .full{grid-column:1/-1;}
+  button{
+    font-family:var(--font-display); font-weight:600; font-size:13.5px; letter-spacing:0.02em;
+    border:1px solid var(--border); background:var(--bg-raised); color:var(--text);
+    padding:10px 16px; border-radius:4px; cursor:pointer; transition:background .15s, border-color .15s;
+  }
+  button:hover{border-color:var(--text-dim);}
+  button.primary{background:var(--amber); color:var(--board); border-color:var(--amber);}
+  button.primary:hover{background:#f0ad4d;}
+  button.primary:disabled{opacity:0.55; cursor:wait;}
+  button.ghost{background:transparent;}
+  button.small{padding:6px 10px; font-size:12px;}
+  button.danger{color:var(--red); border-color:var(--red-bg);}
+
+  /* ===== table ===== */
+  table{width:100%; border-collapse:collapse; font-family:var(--font-mono); font-size:12.8px;}
+  th{text-align:left; color:var(--text-faint); font-weight:500; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; padding:8px 8px; border-bottom:1px solid var(--border);}
+  td{padding:9px 8px; border-bottom:1px solid var(--border); vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  .tag{display:inline-block; font-size:10.5px; padding:2px 7px; border-radius:3px; text-transform:uppercase; letter-spacing:0.05em; background:var(--bg-raised); color:var(--text-dim); border:1px solid var(--border);}
+  .num{text-align:right; font-variant-numeric:tabular-nums;}
+  .pos{color:var(--green);}
+  .neg{color:var(--red);}
+  .manual-flag{font-size:10.5px; color:var(--amber); display:block; margin-top:3px;}
+  .manual-input{width:78px; padding:5px 6px; font-size:12px;}
+  .empty{color:var(--text-faint); font-size:13px; padding:18px 4px; text-align:center;}
+  .tbl-wrap{overflow-x:auto;}
+
+  /* ===== charts ===== */
+  .chart-box{position:relative; height:220px;}
+  .legend-wrap{display:flex; flex-wrap:wrap; gap:8px 14px; margin-top:12px; font-family:var(--font-mono); font-size:11.5px; color:var(--text-dim);}
+  .dot{display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px;}
+
+  /* ===== news ===== */
+  .news-item{border:1px solid var(--border); border-radius:5px; padding:13px 14px; margin-bottom:10px; background:var(--bg-raised);}
+  .news-item:last-child{margin-bottom:0;}
+  .news-head{display:flex; justify-content:space-between; gap:10px; align-items:baseline; flex-wrap:wrap;}
+  .news-title{font-weight:600; font-size:14px;}
+  .news-meta{font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint); white-space:nowrap;}
+  .news-body{font-size:13px; color:var(--text-dim); line-height:1.55; margin-top:6px;}
+  .news-tags{display:flex; gap:6px; margin-top:9px; flex-wrap:wrap;}
+  .impact{font-family:var(--font-mono); font-size:10.5px; padding:2px 8px; border-radius:3px; text-transform:uppercase; letter-spacing:0.04em;}
+  .impact.positivo{background:var(--green-bg); color:var(--green);}
+  .impact.negativo{background:var(--red-bg); color:var(--red);}
+  .impact.neutral{background:var(--amber-bg); color:var(--amber);}
+
+  .toast{font-family:var(--font-mono); font-size:12px; color:var(--red); margin-top:8px;}
+  .spin{display:inline-block; width:11px; height:11px; border-radius:50%; border:2px solid rgba(0,0,0,0.25); border-top-color:var(--board); animation:spin .7s linear infinite; margin-right:7px; vertical-align:-1px;}
+  @media (prefers-reduced-motion: reduce){.spin{animation:none;}}
+  @keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="board">
+    <div class="board-top">
+      <div class="board-title">Cartera — Rosario, AR</div>
+      <div class="board-updated" id="lastUpdated">Sin actualizar todavía</div>
+    </div>
+    <div class="board-grid">
+      <div class="board-cell">
+        <div class="board-label">Invertido (USD)</div>
+        <div class="board-value" id="totInvertido">US$ 0</div>
+        <div class="board-sub" id="fxLine">Tipo de cambio: sin datos</div>
+      </div>
+      <div class="board-cell">
+        <div class="board-label">Valor actual (USD)</div>
+        <div class="board-value" id="totActual">US$ 0</div>
+        <div class="board-sub" id="totIncompleto"></div>
+      </div>
+      <div class="board-cell">
+        <div class="board-label">Rendimiento</div>
+        <div class="board-value" id="totRend">0%</div>
+        <div class="board-sub" id="totRendMonto">US$ 0</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div>
+      <div class="card">
+        <div class="card-head"><h2>Agregar activo</h2></div>
+        <form class="addform" id="addForm">
+          <label>Ticker
+            <input type="text" id="f_ticker" placeholder="GGAL, AL30, YPFD..." required>
+          </label>
+          <label>Tipo
+            <select id="f_tipo">
+              <option value="Acción">Acción</option>
+              <option value="CEDEAR">CEDEAR</option>
+              <option value="ON">ON</option>
+              <option value="Bono">Bono</option>
+            </select>
+          </label>
+          <label>Cantidad
+            <input type="text" inputmode="decimal" id="f_cantidad" placeholder="100" required>
+          </label>
+          <label>Moneda
+            <select id="f_moneda">
+              <option value="ARS">ARS</option>
+              <option value="USD">USD</option>
+            </select>
+          </label>
+          <label class="full">Precio de compra promedio (por unidad, en la moneda elegida)
+            <input type="text" inputmode="decimal" id="f_precio" placeholder="1250,50" required>
+          </label>
+          <button type="submit" class="primary full">Agregar a la cartera</button>
+        </form>
+        <div id="addError" class="toast"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Mi cartera</h2>
+          <button class="primary" id="btnPrices">Actualizar precios</button>
+        </div>
+        <div class="hint">Los precios se buscan automáticamente con IA consultando Google Finance y Yahoo Finance. Los CEDEARs se buscan como cotización de BYMA en pesos (ticker.BA). En ONs y bonos corporativos poco líquidos puede no encontrarse cotización pública — en ese caso se habilita carga manual.</div>
+        <div class="tbl-wrap" style="margin-top:12px;">
+          <table id="tbl">
+            <thead>
+              <tr>
+                <th>Ticker</th><th>Tipo</th><th class="num">Cant.</th><th class="num">P. compra</th>
+                <th class="num">P. actual</th><th class="num">Valor actual</th><th class="num">Rend.</th><th class="num">Peso</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="tblBody"></tbody>
+          </table>
+        </div>
+        <div id="pricesError" class="toast"></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <div class="card-head"><h2>Ponderación por tipo</h2></div>
+        <div class="chart-box"><canvas id="chartTipo"></canvas></div>
+        <div class="legend-wrap" id="legendTipo"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Ponderación por activo</h2></div>
+        <div class="chart-box"><canvas id="chartActivo"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>Noticias que afectan mi cartera</h2>
+          <button class="primary small" id="btnNews">Actualizar noticias</button>
+        </div>
+        <div class="hint">Búsqueda de noticias recientes en Yahoo Finance, Google Finance y medios financieros, con análisis de impacto por activo.</div>
+        <div id="newsWrap" style="margin-top:12px;"></div>
+        <div id="newsError" class="toast"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const STORAGE_KEY = 'cartera_activos';
+const FX_KEY = 'cartera_fx';
+const NEWS_KEY = 'cartera_noticias';
+
+let portfolio = [];
+let fx = null; // {ccl, fecha}
+let chartTipo = null, chartActivo = null;
+
+const fmtMoney = (n, cur='ARS') => {
+  if (n === null || n === undefined || isNaN(n)) return '—';
+  const symbol = cur === 'USD' ? 'US$ ' : '$ ';
+  return symbol + n.toLocaleString('es-AR', {maximumFractionDigits: 2});
+};
+const fmtPct = (n) => {
+  if (n === null || n === undefined || isNaN(n)) return '—';
+  const s = n > 0 ? '+' : '';
+  return s + n.toLocaleString('es-AR', {maximumFractionDigits: 1}) + '%';
+};
+
+async function loadState(){
+  try{
+    const r = await window.storage.get(STORAGE_KEY);
+    portfolio = r ? JSON.parse(r.value) : [];
+  }catch(e){ portfolio = []; }
+  try{
+    const r2 = await window.storage.get(FX_KEY);
+    fx = r2 ? JSON.parse(r2.value) : null;
+  }catch(e){ fx = null; }
+  try{
+    const r3 = await window.storage.get(NEWS_KEY);
+    if (r3) renderNews(JSON.parse(r3.value));
+  }catch(e){}
+}
+
+async function savePortfolio(){
+  try{ await window.storage.set(STORAGE_KEY, JSON.stringify(portfolio)); }catch(e){}
+}
+async function saveFx(){
+  try{ await window.storage.set(FX_KEY, JSON.stringify(fx)); }catch(e){}
+}
+async function saveNews(data){
+  try{ await window.storage.set(NEWS_KEY, JSON.stringify(data)); }catch(e){}
+}
+
+function toUsd(amount, moneda){
+  if (amount === null || amount === undefined) return null;
+  if (moneda === 'USD') return amount;
+  if (moneda === 'ARS') return (fx && fx.ccl) ? amount / fx.ccl : null;
+  return null;
+}
+
+function computeRow(a){
+  // Bonos y Obligaciones Negociables cotizan cada 100 de valor nominal (convención de renta fija):
+  // el valor real es cantidad * precio / 100. Acciones y CEDEARs se valúan directo (cantidad * precio).
+  const factor = (a.tipo === 'Bono' || a.tipo === 'ON') ? 0.01 : 1;
+  const invertido = a.cantidad * a.precioCompra * factor;
+  const precioActual = (a.precioActual !== null && a.precioActual !== undefined) ? a.precioActual : a.precioCompra;
+  const valorActual = a.cantidad * precioActual * factor;
+  const rendPct = invertido !== 0 ? ((valorActual - invertido) / invertido) * 100 : null;
+  const rendMonto = valorActual - invertido;
+  return {invertido, valorActual, rendPct, rendMonto, precioActual};
+}
+
+function renderAll(){
+  renderTable();
+  renderTotals();
+  renderCharts();
+}
+
+function renderTable(){
+  const tbody = document.getElementById('tblBody');
+  if (!portfolio.length){
+    tbody.innerHTML = '<tr><td colspan="9" class="empty">Todavía no cargaste activos. Agregá el primero arriba.</td></tr>';
+    return;
+  }
+  const totalUsdAll = portfolio.reduce((s,a)=>{
+    const r = computeRow(a);
+    const usdVal = toUsd(r.valorActual, a.moneda);
+    return s + (usdVal || 0);
+  },0);
+
+  tbody.innerHTML = portfolio.map(a=>{
+    const r = computeRow(a);
+    const usdVal = toUsd(r.valorActual, a.moneda);
+    const peso = totalUsdAll > 0 && usdVal !== null ? (usdVal/totalUsdAll*100) : null;
+    const rendClass = r.rendPct === null ? '' : (r.rendPct >= 0 ? 'pos' : 'neg');
+    const manualBlock = a.encontrado === false
+      ? `<span class="manual-flag">No encontrado — cargar manual:
+          <input type="text" inputmode="decimal" class="manual-input" value="${a.precioActual ?? ''}" data-id="${a.id}" onchange="setManualPrice(this)">
+         </span>`
+      : '';
+    return `<tr>
+      <td>${a.ticker}</td>
+      <td><span class="tag">${a.tipo}</span></td>
+      <td class="num">${a.cantidad}</td>
+      <td class="num">${fmtMoney(a.precioCompra, a.moneda)}</td>
+      <td class="num">${fmtMoney(r.precioActual, a.moneda)}${manualBlock}</td>
+      <td class="num">${fmtMoney(r.valorActual, a.moneda)}</td>
+      <td class="num ${rendClass}">${fmtPct(r.rendPct)}</td>
+      <td class="num">${peso !== null ? peso.toFixed(1)+'%' : '—'}</td>
+      <td><button class="ghost small danger" onclick="deleteAsset('${a.id}')">Quitar</button></td>
+    </tr>`;
+  }).join('');
+}
+
+window.setManualPrice = function(input){
+  const id = input.dataset.id;
+  const val = parseFloat((input.value||'').replace(',','.'));
+  const a = portfolio.find(x=>x.id===id);
+  if (a && !isNaN(val)){
+    a.precioActual = val;
+    a.encontrado = true;
+    a.manual = true;
+    savePortfolio();
+    renderAll();
+  }
+};
+
+window.deleteAsset = function(id){
+  portfolio = portfolio.filter(a=>a.id!==id);
+  savePortfolio();
+  renderAll();
+};
+
+function renderTotals(){
+  let invertidoUsd = 0, actualUsd = 0, faltantes = 0;
+  portfolio.forEach(a=>{
+    const r = computeRow(a);
+    const invUsd = toUsd(r.invertido, a.moneda);
+    const valUsd = toUsd(r.valorActual, a.moneda);
+    if (invUsd !== null) invertidoUsd += invUsd; else faltantes++;
+    if (valUsd !== null) actualUsd += valUsd;
+  });
+  document.getElementById('totInvertido').textContent = fmtMoney(invertidoUsd, 'USD');
+  document.getElementById('totActual').textContent = fmtMoney(actualUsd, 'USD');
+
+  document.getElementById('fxLine').textContent = fx && fx.ccl
+    ? `Dólar CCL usado: $${fx.ccl.toLocaleString('es-AR')} (${fx.fecha||'reciente'})`
+    : 'Dólar CCL: se obtiene al actualizar precios';
+
+  document.getElementById('totIncompleto').textContent = faltantes > 0
+    ? `${faltantes} activo(s) en ARS sin convertir — actualizá precios`
+    : '';
+
+  const rendPct = invertidoUsd > 0 ? ((actualUsd - invertidoUsd)/invertidoUsd*100) : null;
+  const rendMonto = actualUsd - invertidoUsd;
+  const elPct = document.getElementById('totRend');
+  elPct.textContent = fmtPct(rendPct);
+  elPct.className = 'board-value ' + (rendPct===null ? '' : (rendPct>=0?'pos':'neg'));
+  document.getElementById('totRendMonto').textContent = fmtMoney(rendMonto, 'USD');
+}
+
+function renderCharts(){
+  const byTipo = {};
+  const byActivo = [];
+  let totalUsd = 0;
+  portfolio.forEach(a=>{
+    const r = computeRow(a);
+    const usdVal = toUsd(r.valorActual, a.moneda);
+    if (usdVal === null) return;
+    byTipo[a.tipo] = (byTipo[a.tipo]||0) + usdVal;
+    byActivo.push({ticker:a.ticker, val:usdVal});
+    totalUsd += usdVal;
+  });
+
+  const palette = ['#4FA88F','#E8A33D','#C1554A','#7C9CBF','#B08FC7','#D9C46A'];
+
+  const ctxTipo = document.getElementById('chartTipo');
+  const tipoLabels = Object.keys(byTipo);
+  const tipoData = Object.values(byTipo);
+  if (chartTipo) chartTipo.destroy();
+  if (tipoLabels.length){
+    chartTipo = new Chart(ctxTipo, {
+      type:'doughnut',
+      data:{labels:tipoLabels, datasets:[{data:tipoData, backgroundColor:palette, borderColor:'#22252a', borderWidth:2}]},
+      options:{plugins:{legend:{display:false}}, cutout:'62%', maintainAspectRatio:false}
+    });
+    document.getElementById('legendTipo').innerHTML = tipoLabels.map((l,i)=>{
+      const pct = totalUsd>0 ? (byTipo[l]/totalUsd*100).toFixed(1) : '0';
+      return `<span><span class="dot" style="background:${palette[i%palette.length]}"></span>${l} — ${pct}%</span>`;
+    }).join('');
+  } else {
+    document.getElementById('legendTipo').innerHTML = '';
+  }
+
+  const ctxAct = document.getElementById('chartActivo');
+  byActivo.sort((a,b)=>b.val-a.val);
+  if (chartActivo) chartActivo.destroy();
+  if (byActivo.length){
+    chartActivo = new Chart(ctxAct, {
+      type:'bar',
+      data:{
+        labels:byActivo.map(x=>x.ticker),
+        datasets:[{data:byActivo.map(x=>x.val), backgroundColor:'#E8A33D', borderRadius:3}]
+      },
+      options:{
+        indexAxis:'y',
+        plugins:{legend:{display:false}},
+        scales:{
+          x:{ticks:{color:'#9BA1A8', font:{family:'IBM Plex Mono', size:10}}, grid:{color:'#3c414a'}},
+          y:{ticks:{color:'#EDEAE2', font:{family:'IBM Plex Mono', size:11}}, grid:{display:false}}
+        },
+        maintainAspectRatio:false
+      }
+    });
+  }
+}
+
+function uid(){
+  try{
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+  }catch(e){}
+  return 'id-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+}
+
+document.getElementById('addForm').addEventListener('submit', (e)=>{
+  e.preventDefault();
+  const addErr = document.getElementById('addError');
+  addErr.textContent = '';
+  try{
+    const ticker = document.getElementById('f_ticker').value.trim().toUpperCase();
+    const cantidad = parseFloat((document.getElementById('f_cantidad').value||'').replace(',','.'));
+    const precioCompra = parseFloat((document.getElementById('f_precio').value||'').replace(',','.'));
+
+    if (!ticker){ addErr.textContent = 'Ingresá un ticker.'; return; }
+    if (isNaN(cantidad) || cantidad <= 0){ addErr.textContent = 'La cantidad tiene que ser un número mayor a 0.'; return; }
+    if (isNaN(precioCompra) || precioCompra <= 0){ addErr.textContent = 'El precio de compra tiene que ser un número mayor a 0.'; return; }
+
+    const a = {
+      id: uid(),
+      ticker,
+      tipo: document.getElementById('f_tipo').value,
+      cantidad,
+      moneda: document.getElementById('f_moneda').value,
+      precioCompra,
+      precioActual: null,
+      encontrado: null,
+      variacionPct: null,
+      manual: false
+    };
+    portfolio.push(a);
+    savePortfolio();
+    e.target.reset();
+    document.getElementById('f_tipo').value = 'Acción';
+    document.getElementById('f_moneda').value = 'ARS';
+    renderAll();
+  }catch(err){
+    addErr.textContent = 'No se pudo agregar el activo (' + err.message + ').';
+  }
+});
+
+function extractText(content){
+  return content.filter(b=>b.type==='text').map(b=>b.text).join('\n');
+}
+function parseJsonLoose(text){
+  let cleaned = text.replace(/```json/gi,'').replace(/```/g,'').trim();
+  const start = cleaned.indexOf('{');
+  const end = cleaned.lastIndexOf('}');
+  if (start === -1 || end === -1 || end < start){
+    throw new Error('La IA no devolvió un JSON reconocible');
+  }
+  cleaned = cleaned.slice(start, end+1);
+  return JSON.parse(cleaned);
+}
+
+async function callClaude(systemPrompt, userPrompt){
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      model:'claude-sonnet-4-6',
+      max_tokens:1000,
+      system: systemPrompt,
+      messages:[{role:'user', content:userPrompt}],
+      tools:[{type:'web_search_20250305', name:'web_search'}]
+    })
+  });
+  if (!resp.ok) throw new Error('Error de red al consultar la IA (' + resp.status + ')');
+  const data = await resp.json();
+  if (data.error) throw new Error(data.error.message || 'Error de la API');
+  const text = extractText(data.content || []);
+  if (data.stop_reason === 'max_tokens' && !text.trim().endsWith('}')){
+    throw new Error('la respuesta se cortó por ser muy larga');
+  }
+  return text;
+}
+
+document.getElementById('btnPrices').addEventListener('click', async ()=>{
+  const btn = document.getElementById('btnPrices');
+  const errBox = document.getElementById('pricesError');
+  errBox.textContent = '';
+  if (!portfolio.length){ errBox.textContent = 'Cargá al menos un activo primero.'; return; }
+  btn.disabled = true;
+  const original = btn.textContent;
+
+  const BATCH_SIZE = 6;
+  const lista = portfolio.map(a=>({ticker:a.ticker, tipo:a.tipo}));
+  const batches = [];
+  for (let i=0; i<lista.length; i+=BATCH_SIZE) batches.push(lista.slice(i, i+BATCH_SIZE));
+
+  const system = 'Devolvé ÚNICAMENTE un objeto JSON válido, compacto, sin texto adicional, sin explicaciones, sin markdown ni backticks. Sé breve.';
+  let huboError = false;
+  let ultimoError = '';
+
+  for (let i=0; i<batches.length; i++){
+    btn.innerHTML = `<span class="spin"></span>Buscando... (${i+1}/${batches.length})`;
+    const batch = batches[i];
+    const prompt = `Buscá el precio actual de estos instrumentos financieros de un inversor argentino, usando Google Finance y Yahoo Finance como fuentes principales. Instrumentos: ${JSON.stringify(batch)}.
+Los de tipo "CEDEAR" cotizan en BYMA (mercado argentino) EN PESOS, no en dólares — buscá el ticker con sufijo ".BA" (ej. "AMZN.BA", "MSFT.BA", "SPY.BA") en Yahoo Finance o Google Finance, que es la cotización local del CEDEAR en ARS. No uses el precio del activo subyacente de EE.UU. en dólares para los CEDEARs.
+Para ONs y bonos corporativos o soberanos argentinos, si no encontrás una cotización pública confiable en esas fuentes, marcá encontrado:false.
+También buscá el tipo de cambio dólar CCL (contado con liquidación) o MEP más reciente en pesos argentinos.
+Sé conciso, sin comentarios extra. Devolvé exactamente este formato JSON:
+{"activos":[{"ticker":"...","precio":number,"moneda":"ARS"|"USD","variacion_pct":number,"fuente":"...","encontrado":boolean}],"tipo_cambio":{"ccl":number,"fecha":"..."}}`;
+    try{
+      const text = await callClaude(system, prompt);
+      const json = parseJsonLoose(text);
+      (json.activos||[]).forEach(res=>{
+        const a = portfolio.find(x=>x.ticker.toUpperCase() === (res.ticker||'').toUpperCase());
+        if (a){
+          a.encontrado = !!res.encontrado;
+          if (res.encontrado){
+            a.precioActual = res.precio;
+            a.variacionPct = res.variacion_pct ?? null;
+            a.manual = false;
+          }
+        }
+      });
+      if (json.tipo_cambio && json.tipo_cambio.ccl){
+        fx = {ccl: json.tipo_cambio.ccl, fecha: json.tipo_cambio.fecha};
+        await saveFx();
+      }
+      await savePortfolio();
+      renderAll();
+    }catch(err){
+      huboError = true;
+      ultimoError = err.message;
+    }
+  }
+
+  if (huboError){
+    errBox.textContent = 'Algunos activos no se pudieron actualizar (' + ultimoError + '). Podés reintentar o cargar el precio manualmente en la tabla.';
+  }
+  document.getElementById('lastUpdated').textContent = 'Actualizado ' + new Date().toLocaleString('es-AR');
+  btn.disabled = false;
+  btn.textContent = original;
+});
+
+function renderNews(data){
+  const wrap = document.getElementById('newsWrap');
+  if (!data || !data.noticias || !data.noticias.length){
+    wrap.innerHTML = '<div class="empty">Todavía no hay noticias cargadas.</div>';
+    return;
+  }
+  let html = '';
+  if (data.resumen_general){
+    html += `<div class="hint" style="margin-bottom:12px;"><strong style="color:var(--text)">Resumen:</strong> ${data.resumen_general}</div>`;
+  }
+  html += data.noticias.map(n=>`
+    <div class="news-item">
+      <div class="news-head">
+        <div class="news-title">${n.titular||''}</div>
+        <div class="news-meta">${n.fuente||''} · ${n.fecha||''}</div>
+      </div>
+      <div class="news-body">${n.resumen||''}</div>
+      <div class="news-tags">
+        ${(n.activos_afectados||[]).map(t=>`<span class="tag">${t}</span>`).join('')}
+        <span class="impact ${n.impacto||'neutral'}">${n.impacto||'neutral'}</span>
+      </div>
+      ${n.explicacion_impacto ? `<div class="news-body" style="margin-top:6px;"><em>${n.explicacion_impacto}</em></div>` : ''}
+    </div>
+  `).join('');
+  wrap.innerHTML = html;
+}
+
+document.getElementById('btnNews').addEventListener('click', async ()=>{
+  const btn = document.getElementById('btnNews');
+  const errBox = document.getElementById('newsError');
+  errBox.textContent = '';
+  if (!portfolio.length){ errBox.textContent = 'Cargá al menos un activo primero.'; return; }
+  btn.disabled = true;
+  const original = btn.textContent;
+  btn.innerHTML = '<span class="spin"></span>Buscando...';
+  try{
+    const activos = portfolio.map(a=>`${a.ticker} (${a.tipo})`).join(', ');
+    const system = 'Devolvé ÚNICAMENTE un objeto JSON válido, sin texto adicional, sin explicaciones, sin markdown ni backticks.';
+    const prompt = `Buscá las noticias financieras más relevantes de los últimos 2-3 días que puedan afectar a esta cartera de un inversor argentino: ${activos}.
+Priorizá fuentes como Yahoo Finance, Google Finance y medios financieros reconocidos (Reuters, Bloomberg, Ámbito, El Cronista, Infobae Economía). Para cada noticia relevante, indicá qué activo(s) de la lista afecta y explicá brevemente el impacto potencial (positivo, negativo o neutral) y por qué.
+Máximo 4 noticias. Sé muy conciso: resumen y explicación de impacto de 1-2 oraciones cortas cada uno, sin rodeos. Priorizá relevancia real para estos activos específicos por sobre noticias genéricas de mercado.
+Devolvé exactamente este formato JSON:
+{"resumen_general":"...","noticias":[{"titular":"...","fuente":"...","fecha":"...","resumen":"...","activos_afectados":["TICKER"],"impacto":"positivo"|"negativo"|"neutral","explicacion_impacto":"..."}]}`;
+    const text = await callClaude(system, prompt);
+    const json = parseJsonLoose(text);
+    renderNews(json);
+    await saveNews(json);
+  }catch(err){
+    errBox.textContent = 'No se pudieron buscar noticias en este momento (' + err.message + '). Probá de nuevo en unos segundos.';
+  }finally{
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+});
+
+const SEED_DATA = [
+  {ticker:'AE38', tipo:'Bono', cantidad:4.00, precioCompra:73.93, precioActual:78.16},
+  {ticker:'T15E7', tipo:'Bono', cantidad:11043.00, precioCompra:0.09, precioActual:0.09},
+  {ticker:'T30A7', tipo:'Bono', cantidad:7473.00, precioCompra:0.08, precioActual:0.09},
+  {ticker:'TZXM7', tipo:'Bono', cantidad:244656.00, precioCompra:0.14, precioActual:0.14},
+  {ticker:'AMZN', tipo:'CEDEAR', cantidad:72.00, precioCompra:1.50, precioActual:1.87},
+  {ticker:'BRKB', tipo:'CEDEAR', cantidad:135.00, precioCompra:23.42, precioActual:23.50},
+  {ticker:'DIA', tipo:'CEDEAR', cantidad:13.00, precioCompra:25.61, precioActual:27.69},
+  {ticker:'EWZ', tipo:'CEDEAR', cantidad:8.00, precioCompra:16.81, precioActual:18.15},
+  {ticker:'GLD', tipo:'CEDEAR', cantidad:36.00, precioCompra:7.99, precioActual:8.80},
+  {ticker:'MELI', tipo:'CEDEAR', cantidad:20.00, precioCompra:16.35, precioActual:16.62},
+  {ticker:'MSFT', tipo:'CEDEAR', cantidad:1.00, precioCompra:14.00, precioActual:16.71},
+  {ticker:'QQQ', tipo:'CEDEAR', cantidad:11.00, precioCompra:35.53, precioActual:37.05},
+  {ticker:'SPY', tipo:'CEDEAR', cantidad:62.00, precioCompra:11.81, precioActual:13.30},
+  {ticker:'VEA', tipo:'CEDEAR', cantidad:101.00, precioCompra:7.26, precioActual:7.63},
+  {ticker:'VIST', tipo:'CEDEAR', cantidad:10.00, precioCompra:18.21, precioActual:24.06},
+  {ticker:'XLB', tipo:'CEDEAR', cantidad:100.00, precioCompra:3.09, precioActual:3.10},
+  {ticker:'XLF', tipo:'CEDEAR', cantidad:10.00, precioCompra:30.21, precioActual:29.90},
+  {ticker:'XLP', tipo:'CEDEAR', cantidad:100.00, precioCompra:5.09, precioActual:5.59},
+  {ticker:'XLU', tipo:'CEDEAR', cantidad:176.00, precioCompra:3.01, precioActual:2.97},
+  {ticker:'HVS1O', tipo:'ON', cantidad:35.00, precioCompra:105.46, precioActual:105.39},
+  {ticker:'MGCQO', tipo:'ON', cantidad:2539.00, precioCompra:103.91, precioActual:106.08},
+  {ticker:'PN35O', tipo:'ON', cantidad:945.00, precioCompra:105.53, precioActual:107.35},
+  {ticker:'PN37O', tipo:'ON', cantidad:333.00, precioCompra:105.05, precioActual:104.74},
+  {ticker:'VSCPO', tipo:'ON', cantidad:1392.00, precioCompra:107.49, precioActual:108.52},
+  {ticker:'VSCRO', tipo:'ON', cantidad:1308.00, precioCompra:107.26, precioActual:109.94},
+  {ticker:'YFCLO', tipo:'ON', cantidad:1108.00, precioCompra:103.80, precioActual:103.01},
+  {ticker:'YM39O', tipo:'ON', cantidad:344.00, precioCompra:109.30, precioActual:111.26},
+  {ticker:'YM42O', tipo:'ON', cantidad:1456.00, precioCompra:103.12, precioActual:105.82},
+  {ticker:'PAMP', tipo:'Acción', cantidad:55.00, precioCompra:3.51, precioActual:3.31},
+  {ticker:'YPFD', tipo:'Acción', cantidad:50.00, precioCompra:3.89, precioActual:5.31}
+].map(a => ({...a, moneda:'USD', encontrado:true, variacionPct:null, manual:true}));
+
+(async function init(){
+  await loadState();
+  if (!portfolio.length){
+    portfolio = SEED_DATA.map(a => ({...a, id: uid()}));
+    await savePortfolio();
+  }
+  renderAll();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "name": "@cartera/contratos",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "tipos": "tsc -p ."
+  }
+}

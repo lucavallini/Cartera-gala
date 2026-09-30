@@ -1,0 +1,605 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generado/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ───────────── Enums ─────────────
+
+enum Rol {
+  ADMIN
+  USUARIO
+}
+
+enum Moneda {
+  ARS
+  USD_MEP
+  USD_CCL
+  USD_EXTERIOR
+}
+
+enum TipoDolar {
+  OFICIAL
+  MEP
+  CCL
+  BLUE
+  MAYORISTA
+  CRIPTO
+}
+
+enum MetodoCosto {
+  PRECIO_PROMEDIO
+  FIFO
+}
+
+enum TipoInstrumento {
+  ACCION
+  CEDEAR
+  ON
+  BONO
+  LETRA
+  FCI
+  ETF_EXTERIOR
+  CAUCION
+  PLAZO_FIJO
+  CRIPTO
+  OPCION
+  FUTURO
+  INDICE
+  OTRO
+}
+
+enum Mercado {
+  BYMA
+  MAE
+  NYSE
+  NASDAQ
+  CRIPTO
+  FONDO
+  BANCO
+  OTRO
+}
+
+enum TipoAjuste {
+  NINGUNO
+  CER
+  DOLAR_LINKED
+  TASA_FIJA
+  BADLAR
+  TAMAR
+  UVA
+  OTRO
+}
+
+enum Ley {
+  ARGENTINA
+  NUEVA_YORK
+  OTRA
+}
+
+enum TipoOperacion {
+  TENENCIA_INICIAL
+  COMPRA
+  VENTA
+  DIVIDENDO
+  RENTA
+  AMORTIZACION
+  SUSCRIPCION_FCI
+  RESCATE_FCI
+  DEPOSITO
+  EXTRACCION
+  COMPRA_MONEDA
+  VENTA_MONEDA
+  CAUCION_COLOCACION
+  CAUCION_VENCIMIENTO
+  COMISION
+  IMPUESTO
+  SPLIT
+  CANJE
+  TRANSFERENCIA_ENTRADA
+  TRANSFERENCIA_SALIDA
+  AJUSTE
+}
+
+enum OrigenOperacion {
+  MANUAL
+  IMPORTACION
+  SISTEMA
+}
+
+enum DimensionAsignacion {
+  TIPO
+  INSTRUMENTO
+  SECTOR
+  MONEDA
+  PAIS
+  ETIQUETA
+}
+
+enum TipoAlerta {
+  PRECIO_MAYOR_A
+  PRECIO_MENOR_A
+  VARIACION_DIARIA
+  VENCIMIENTO
+  COBRO_PROXIMO
+  NOTICIA
+}
+
+enum CanalNotificacion {
+  APP
+  EMAIL
+  TELEGRAM
+}
+
+enum Impacto {
+  POSITIVO
+  NEGATIVO
+  NEUTRAL
+}
+
+enum EstadoImportacion {
+  VISTA_PREVIA
+  CONFIRMADA
+  ERROR
+  REVERTIDA
+}
+
+enum TipoIndice {
+  IPC
+  CER
+  UVA
+  BADLAR
+  TAMAR
+}
+
+enum AccionAuditoria {
+  CREAR
+  EDITAR
+  BORRAR
+  RESTAURAR
+}
+
+// ───────────── Usuarios y acceso ─────────────
+
+model Usuario {
+  id              String      @id @default(cuid())
+  nombre          String
+  email           String      @unique
+  hashPassword    String
+  rol             Rol         @default(USUARIO)
+  monedaBase      Moneda      @default(USD_MEP)
+  dolarReferencia TipoDolar   @default(MEP)
+  metodoCosto     MetodoCosto @default(PRECIO_PROMEDIO)
+  preferencias    Json?
+  creadoEn        DateTime    @default(now())
+  actualizadoEn   DateTime    @updatedAt
+  eliminadoEn     DateTime?
+
+  sesiones             Sesion[]
+  carteras             Cartera[]
+  cuentas              Cuenta[]
+  instrumentos         InstrumentoUsuario[]
+  etiquetas            Etiqueta[]
+  instrumentoEtiquetas InstrumentoEtiqueta[]
+  alertas              Alerta[]
+  notificaciones       Notificacion[]
+  informesNoticias     InformeNoticias[]
+  importaciones        Importacion[]
+  auditorias           RegistroAuditoria[]
+  flujosCargados       FlujoProgramado[]
+}
+
+model Sesion {
+  id               String    @id @default(cuid())
+  usuarioId        String
+  tokenHash        String    @unique
+  expiraEn         DateTime
+  userAgent        String?
+  ip               String?
+  revocadaEn       DateTime?
+  reemplazadaPorId String?   @unique
+  creadoEn         DateTime  @default(now())
+  actualizadoEn    DateTime  @updatedAt
+
+  usuario        Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  reemplazadaPor Sesion? @relation("RotacionSesion", fields: [reemplazadaPorId], references: [id])
+  reemplazaA     Sesion? @relation("RotacionSesion")
+
+  @@index([usuarioId])
+}
+
+// ───────────── Estructura de la cartera ─────────────
+
+model Cartera {
+  id            String    @id @default(cuid())
+  usuarioId     String
+  nombre        String
+  descripcion   String?
+  esPrincipal   Boolean   @default(false)
+  archivada     Boolean   @default(false)
+  orden         Int       @default(0)
+  creadoEn      DateTime  @default(now())
+  actualizadoEn DateTime  @updatedAt
+  eliminadoEn   DateTime?
+
+  usuario          Usuario              @relation(fields: [usuarioId], references: [id])
+  operaciones      Operacion[]
+  snapshots        SnapshotCartera[]
+  objetivos        ObjetivoAsignacion[]
+  informesNoticias InformeNoticias[]
+  importaciones    Importacion[]
+
+  @@index([usuarioId])
+}
+
+model Cuenta {
+  id              String    @id @default(cuid())
+  usuarioId       String
+  broker          String
+  numeroComitente String?
+  alias           String?
+  creadoEn        DateTime  @default(now())
+  actualizadoEn   DateTime  @updatedAt
+  eliminadoEn     DateTime?
+
+  usuario       Usuario       @relation(fields: [usuarioId], references: [id])
+  operaciones   Operacion[]
+  importaciones Importacion[]
+
+  @@index([usuarioId])
+}
+
+// ───────────── Catálogo de instrumentos ─────────────
+
+model Instrumento {
+  id               String          @id @default(cuid())
+  ticker           String
+  nombre           String?
+  tipo             TipoInstrumento
+  mercado          Mercado
+  emisor           String?
+  sector           String?
+  industria        String?
+  pais             String?
+  isin             String?
+  tickerSubyacente String?
+  ratioCedear      String?
+  simbolos         Json
+  factorPrecio     Decimal         @default(1)
+  valorNominal     Decimal?
+  fechaEmision     DateTime?
+  fechaVencimiento DateTime?
+  tasaCupon        Decimal?
+  frecuenciaCupon  Int?
+  ley              Ley?
+  tipoAjuste       TipoAjuste      @default(NINGUNO)
+  activo           Boolean         @default(true)
+  atributos        Json?
+  creadoEn         DateTime        @default(now())
+  actualizadoEn    DateTime        @updatedAt
+
+  flujos       FlujoProgramado[]
+  operaciones  Operacion[]
+  cotizaciones Cotizacion[]
+  usuarios     InstrumentoUsuario[]
+  etiquetas    InstrumentoEtiqueta[]
+  alertas      Alerta[]
+  noticias     NoticiaInstrumento[]
+
+  @@unique([ticker, mercado])
+}
+
+model FlujoProgramado {
+  id                  String   @id @default(cuid())
+  instrumentoId       String
+  fecha               DateTime
+  renta               Decimal  @default(0)
+  amortizacion        Decimal  @default(0)
+  moneda              Moneda
+  cargadoPorUsuarioId String?
+  creadoEn            DateTime @default(now())
+  actualizadoEn       DateTime @updatedAt
+
+  instrumento Instrumento @relation(fields: [instrumentoId], references: [id])
+  cargadoPor  Usuario?    @relation(fields: [cargadoPorUsuarioId], references: [id])
+
+  @@unique([instrumentoId, fecha])
+}
+
+// ───────────── Movimientos ─────────────
+
+model Operacion {
+  id                     String          @id @default(cuid())
+  carteraId              String
+  cuentaId               String?
+  instrumentoId          String?
+  tipo                   TipoOperacion
+  fechaConcertacion      DateTime
+  fechaLiquidacion       DateTime?
+  cantidad               Decimal?
+  precio                 Decimal?
+  moneda                 Moneda
+  tipoCambio             Decimal?
+  comision               Decimal         @default(0)
+  derechosMercado        Decimal         @default(0)
+  iva                    Decimal         @default(0)
+  otrosGastos            Decimal         @default(0)
+  montoNeto              Decimal?
+  ratio                  Decimal?
+  operacionRelacionadaId String?
+  origen                 OrigenOperacion @default(MANUAL)
+  importacionId          String?
+  notas                  String?
+  creadoEn               DateTime        @default(now())
+  actualizadoEn          DateTime        @updatedAt
+  eliminadoEn            DateTime?
+
+  cartera              Cartera      @relation(fields: [carteraId], references: [id])
+  cuenta               Cuenta?      @relation(fields: [cuentaId], references: [id])
+  instrumento          Instrumento? @relation(fields: [instrumentoId], references: [id])
+  importacion          Importacion? @relation(fields: [importacionId], references: [id])
+  operacionRelacionada Operacion?   @relation("OperacionesRelacionadas", fields: [operacionRelacionadaId], references: [id])
+  relacionadas         Operacion[]  @relation("OperacionesRelacionadas")
+
+  @@index([carteraId, fechaConcertacion])
+  @@index([instrumentoId])
+  @@index([importacionId])
+}
+
+// ───────────── Datos de mercado e historia ─────────────
+
+model Cotizacion {
+  id            String   @id @default(cuid())
+  instrumentoId String
+  fecha         DateTime
+  moneda        Moneda
+  apertura      Decimal?
+  maximo        Decimal?
+  minimo        Decimal?
+  cierre        Decimal
+  volumen       Decimal?
+  fuente        String
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  instrumento Instrumento @relation(fields: [instrumentoId], references: [id])
+
+  @@unique([instrumentoId, fecha, moneda])
+}
+
+model TipoCambio {
+  id            String    @id @default(cuid())
+  fecha         DateTime
+  tipo          TipoDolar
+  compra        Decimal?
+  venta         Decimal
+  fuente        String
+  creadoEn      DateTime  @default(now())
+  actualizadoEn DateTime  @updatedAt
+
+  @@unique([fecha, tipo])
+}
+
+model IndiceEconomico {
+  id            String     @id @default(cuid())
+  tipo          TipoIndice
+  fecha         DateTime
+  valor         Decimal
+  fuente        String
+  creadoEn      DateTime   @default(now())
+  actualizadoEn DateTime   @updatedAt
+
+  @@unique([tipo, fecha])
+}
+
+model SnapshotCartera {
+  id                      String   @id @default(cuid())
+  carteraId               String
+  fecha                   DateTime
+  valorArs                Decimal
+  valorUsd                Decimal
+  invertidoArs            Decimal
+  invertidoUsd            Decimal
+  efectivoArs             Decimal
+  efectivoUsd             Decimal
+  resultadoRealizadoUsd   Decimal
+  resultadoNoRealizadoUsd Decimal
+  flujoNetoDelDiaUsd      Decimal
+  creadoEn                DateTime @default(now())
+  actualizadoEn           DateTime @updatedAt
+
+  cartera Cartera @relation(fields: [carteraId], references: [id])
+
+  @@unique([carteraId, fecha])
+}
+
+// ───────────── Herramientas del inversor ─────────────
+
+model InstrumentoUsuario {
+  id                  String    @id @default(cuid())
+  usuarioId           String
+  instrumentoId       String
+  enSeguimiento       Boolean   @default(false)
+  precioObjetivo      Decimal?
+  notas               String?
+  sectorPersonalizado String?
+  precioManual        Decimal?
+  precioManualMoneda  Moneda?
+  precioManualEn      DateTime?
+  creadoEn            DateTime  @default(now())
+  actualizadoEn       DateTime  @updatedAt
+
+  usuario     Usuario     @relation(fields: [usuarioId], references: [id])
+  instrumento Instrumento @relation(fields: [instrumentoId], references: [id])
+
+  @@unique([usuarioId, instrumentoId])
+}
+
+model Etiqueta {
+  id            String    @id @default(cuid())
+  usuarioId     String
+  nombre        String
+  color         String
+  creadoEn      DateTime  @default(now())
+  actualizadoEn DateTime  @updatedAt
+  eliminadoEn   DateTime?
+
+  usuario      Usuario               @relation(fields: [usuarioId], references: [id])
+  instrumentos InstrumentoEtiqueta[]
+
+  @@index([usuarioId])
+}
+
+model InstrumentoEtiqueta {
+  usuarioId     String
+  instrumentoId String
+  etiquetaId    String
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  usuario     Usuario     @relation(fields: [usuarioId], references: [id])
+  instrumento Instrumento @relation(fields: [instrumentoId], references: [id])
+  etiqueta    Etiqueta    @relation(fields: [etiquetaId], references: [id])
+
+  @@id([usuarioId, instrumentoId, etiquetaId])
+}
+
+model ObjetivoAsignacion {
+  id                 String              @id @default(cuid())
+  carteraId          String
+  dimension          DimensionAsignacion
+  clave              String
+  porcentajeObjetivo Decimal
+  creadoEn           DateTime            @default(now())
+  actualizadoEn      DateTime            @updatedAt
+
+  cartera Cartera @relation(fields: [carteraId], references: [id])
+
+  @@unique([carteraId, dimension, clave])
+}
+
+model Alerta {
+  id                String            @id @default(cuid())
+  usuarioId         String
+  instrumentoId     String?
+  tipo              TipoAlerta
+  umbral            Decimal?
+  canal             CanalNotificacion @default(APP)
+  activa            Boolean           @default(true)
+  ultimaDisparadaEn DateTime?
+  creadoEn          DateTime          @default(now())
+  actualizadoEn     DateTime          @updatedAt
+  eliminadoEn       DateTime?
+
+  usuario        Usuario        @relation(fields: [usuarioId], references: [id])
+  instrumento    Instrumento?   @relation(fields: [instrumentoId], references: [id])
+  notificaciones Notificacion[]
+
+  @@index([usuarioId])
+}
+
+model Notificacion {
+  id            String    @id @default(cuid())
+  usuarioId     String
+  alertaId      String?
+  titulo        String
+  cuerpo        String
+  leidaEn       DateTime?
+  creadoEn      DateTime  @default(now())
+  actualizadoEn DateTime  @updatedAt
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+  alerta  Alerta? @relation(fields: [alertaId], references: [id])
+
+  @@index([usuarioId, leidaEn])
+}
+
+// ───────────── Noticias, importación y auditoría ─────────────
+
+model Noticia {
+  id                 String   @id @default(cuid())
+  url                String   @unique
+  titulo             String
+  fuente             String
+  publicadaEn        DateTime
+  resumenIa          String?
+  impacto            Impacto?
+  explicacionImpacto String?
+  creadoEn           DateTime @default(now())
+  actualizadoEn      DateTime @updatedAt
+
+  instrumentos NoticiaInstrumento[]
+}
+
+model NoticiaInstrumento {
+  noticiaId     String
+  instrumentoId String
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  noticia     Noticia     @relation(fields: [noticiaId], references: [id])
+  instrumento Instrumento @relation(fields: [instrumentoId], references: [id])
+
+  @@id([noticiaId, instrumentoId])
+}
+
+model InformeNoticias {
+  id             String   @id @default(cuid())
+  usuarioId      String
+  carteraId      String
+  generadoEn     DateTime @default(now())
+  resumenGeneral String?
+  noticiaIds     Json
+  iaDisponible   Boolean
+  creadoEn       DateTime @default(now())
+  actualizadoEn  DateTime @updatedAt
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+  cartera Cartera @relation(fields: [carteraId], references: [id])
+
+  @@index([usuarioId, carteraId])
+}
+
+model Importacion {
+  id              String            @id @default(cuid())
+  usuarioId       String
+  carteraId       String
+  cuentaId        String?
+  formato         String
+  nombreArchivo   String
+  estado          EstadoImportacion @default(VISTA_PREVIA)
+  filasLeidas     Int               @default(0)
+  filasImportadas Int               @default(0)
+  filas           Json?
+  errores         Json?
+  confirmadaEn    DateTime?
+  revertidaEn     DateTime?
+  creadoEn        DateTime          @default(now())
+  actualizadoEn   DateTime          @updatedAt
+
+  usuario     Usuario     @relation(fields: [usuarioId], references: [id])
+  cartera     Cartera     @relation(fields: [carteraId], references: [id])
+  cuenta      Cuenta?     @relation(fields: [cuentaId], references: [id])
+  operaciones Operacion[]
+
+  @@index([usuarioId])
+}
+
+model RegistroAuditoria {
+  id        String          @id @default(cuid())
+  usuarioId String
+  entidad   String
+  entidadId String
+  accion    AccionAuditoria
+  antes     Json?
+  despues   Json?
+  fecha     DateTime        @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@index([entidad, entidadId])
+  @@index([usuarioId])
+}
